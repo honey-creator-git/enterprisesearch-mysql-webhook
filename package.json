@@ -9,15 +9,18 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@azure/storage-blob": "^12.26.0",
     "@elastic/elasticsearch": "^8.16.2",
     "axios": "^1.7.8",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.6",
+    "file-type": "^19.6.0",
     "fs": "^0.0.1-security",
     "mammoth": "^1.8.0",
     "mysql2": "^3.11.5",
     "node-cron": "^3.0.3",
     "pdf-parse": "^1.1.1",
+    "textract": "^2.5.0",
     "xlsx": "^0.18.5",
     "xml2js": "^0.6.2"
   }

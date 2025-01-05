@@ -6,7 +6,7 @@ on:
   workflow_dispatch: # Allows manual triggering for testing
 
 jobs:
-  monitor-webhooks:
+  monitor-mysql:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,3 +32,5 @@ jobs:
           ELASTICSEARCH_URL: ${{ secrets.ELASTICSEARCH_URL }}
           AZURE_SEARCH_ENDPOINT: ${{ secrets.AZURE_SEARCH_ENDPOINT }}
           AZURE_SEARCH_API_KEY: ${{ secrets.AZURE_SEARCH_API_KEY }}
+          AZURE_BLOB_CONNECTION_STRING: ${{ secrets.AZURE_BLOB_CONNECTION_STRING }}
+          AZURE_BLOB_CONTAINER_NAME: ${{ secrets.AZURE_BLOB_CONTAINER_NAME }}
