@@ -72,7 +72,12 @@ exports.lastProcessedIdListener = async () => {
 
         // Step 4: Fetch new rows from the table based on the last processed ID
         const [rows] = await connection.query(
-          `SELECT id, ${field_name} AS field_value FROM ${table_name} WHERE id > ? ORDER BY id ASC`,
+          `SELECT id, ${field_name} AS field_value,
+                LENGTH(${field_name}) AS file_size,
+                CURRENT_TIMESTAMP AS uploaded_at
+            FROM ${table_name}
+            WHERE id > ?
+            ORDER BY id ASC`,
           [lastProcessedId || 0]
         );
 
@@ -86,6 +91,7 @@ exports.lastProcessedIdListener = async () => {
           for (const row of rows) {
             let processedContent;
             let fileUrl = "";
+            const fileSizeInMB = (row.file_size / (1024 * 1024)).toFixed(2); // Convert to MB
 
             try {
               const fileBuffer = row.field_value;
@@ -136,6 +142,8 @@ exports.lastProcessedIdListener = async () => {
                   image: null,
                   category: category,
                   fileUrl: fileUrl,
+                  fileSize: parseFloat(fileSizeInMB), // Add file size (in MB)
+                  uploadedAt: row.uploaded_at, // Add uploaded timestamp
                 });
               });
             }
