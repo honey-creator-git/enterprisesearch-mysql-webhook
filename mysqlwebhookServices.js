@@ -162,24 +162,37 @@ async function processFieldContent(content, fieldType) {
 
 // Detect MIME Type from Buffer
 async function detectMimeType(buffer) {
+  if (!buffer || buffer.length === 0) {
+    console.warn("Empty buffer provided.");
+    return "application/octet-stream";
+  }
+
   const { fileTypeFromBuffer } = await import("file-type"); // Dynamic import
-  const fileTypeResult = await fileTypeFromBuffer(buffer); // Correct function
+  const fileTypeResult = await fileTypeFromBuffer(buffer);
 
   // Fallback: Inspect buffer for HTML tags
-  const content = buffer.toString("utf-8").trim();
-  if (content.startsWith("<!DOCTYPE html") || content.startsWith("<html")) {
-    return "text/html";
+  let textContent = "";
+  try {
+    textContent = buffer.toString("utf-8").trim();
+  } catch (error) {
+    console.error("Error decoding buffer as UTF-8:", error.message);
+  }
+
+  if (/^\s*<(?:!DOCTYPE\s+)?html/i.test(textContent)) {
+    return "text/html"; // Robust HTML detection
   }
 
   // Check if fileTypeFromBuffer fails or returns application/octet-stream
   if (!fileTypeResult || fileTypeResult.mime === "application/octet-stream") {
-    // Try reading the buffer as UTF-8 plain text
-    const textContent = buffer.toString("utf-8");
-
-    // Simple heuristic: If the buffer decodes without issues, it's likely plain text
-    if (/^[\x00-\x7F]*$/.test(textContent)) {
+    // Try detecting as plain text
+    if (/^[\x20-\x7E\t\r\n]*$/.test(textContent)) {
       return "text/plain";
     }
+
+    // Optionally use a library like `istextorbinary` for more robust detection:
+    // if (isText(null, buffer)) {
+    //   return "text/plain";
+    // }
   }
 
   return fileTypeResult ? fileTypeResult.mime : "application/octet-stream";
