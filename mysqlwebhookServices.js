@@ -2,6 +2,7 @@ const mammoth = require("mammoth");
 const pdfParse = require("pdf-parse");
 const cheerio = require("cheerio");
 const textract = require("textract");
+const iconv = require("iconv-lite");
 
 async function extractTextFromCsv(content) {
   return content; // Process CSV content if needed
@@ -160,42 +161,79 @@ async function processFieldContent(content, fieldType) {
   }
 }
 
+function normalizeEncoding(buffer) {
+  try {
+    // Decode the buffer using UTF-8
+    const decodedContent = iconv.decode(buffer, "utf-8");
+    console.log(
+      "Decoded content (first 50 chars):",
+      decodedContent.slice(0, 50)
+    );
+    return decodedContent;
+  } catch (error) {
+    console.error("Encoding normalization failed:", error.message);
+    return buffer.toString("utf-8"); // Fallback to UTF-8 string conversion
+  }
+}
+
 // Detect MIME Type from Buffer
 async function detectMimeType(buffer) {
-  if (!buffer || buffer.length === 0) {
-    console.warn("Empty buffer provided.");
-    return "application/octet-stream";
-  }
+  const { fileTypeFromBuffer } = await import("file-type");
 
-  const { fileTypeFromBuffer } = await import("file-type"); // Dynamic import
-  const fileTypeResult = await fileTypeFromBuffer(buffer);
-
-  // Fallback: Inspect buffer for HTML tags
-  let textContent = "";
   try {
-    textContent = buffer.toString("utf-8").trim();
-  } catch (error) {
-    console.error("Error decoding buffer as UTF-8:", error.message);
-  }
+    console.log(
+      "Buffer first 20 bytes (hex):",
+      buffer.slice(0, 20).toString("hex")
+    );
 
-  if (/^\s*<(?:!DOCTYPE\s+)?html/i.test(textContent)) {
-    return "text/html"; // Robust HTML detection
-  }
+    // Use file-type to detect MIME type
+    const fileTypeResult = await fileTypeFromBuffer(buffer);
 
-  // Check if fileTypeFromBuffer fails or returns application/octet-stream
-  if (!fileTypeResult || fileTypeResult.mime === "application/octet-stream") {
-    // Try detecting as plain text
-    if (/^[\x20-\x7E\t\r\n]*$/.test(textContent)) {
+    if (fileTypeResult) {
+      console.log(`Detected MIME type using file-type: ${fileTypeResult.mime}`);
+      return fileTypeResult.mime;
+    }
+
+    const content = buffer.toString("utf-8").trim();
+
+    if (content.startsWith("<!DOCTYPE html") || content.startsWith("<html")) {
+      return "text/html";
+    }
+
+    // Normalize the encoding and analyze the content
+    const normalizedContent = await normalizeEncoding(buffer);
+
+    // Check for UTF-8 compliance using heuristic
+    if (isUtf8(buffer)) {
+      console.log("Content is UTF-8 encoded text.");
       return "text/plain";
     }
 
-    // Optionally use a library like `istextorbinary` for more robust detection:
-    // if (isText(null, buffer)) {
-    //   return "text/plain";
-    // }
+    // Fallback plain text detection
+    const isPlainText = /^[\x20-\x7E\r\n\t]*$/.test(normalizedContent);
+    if (isPlainText) {
+      console.log("Content matches plain text heuristics.");
+      return "text/plain";
+    }
+
+    console.log("Content does not match plain text heuristics.");
+  } catch (error) {
+    console.error("Error in MIME type detection:", error.message);
   }
 
-  return fileTypeResult ? fileTypeResult.mime : "application/octet-stream";
+  // Default fallback for undetectable or unsupported content
+  return "application/octet-stream";
+}
+
+// Helper function to validate UTF-8 encoding
+function isUtf8(buffer) {
+  try {
+    buffer.toString("utf-8"); // If it doesn't throw, it's valid UTF-8
+    return true;
+  } catch (error) {
+    console.error("UTF-8 validation failed:", error.message);
+    return false;
+  }
 }
 
 // Process BLOB field for text extraction
