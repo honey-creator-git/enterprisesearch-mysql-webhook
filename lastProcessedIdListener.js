@@ -50,6 +50,7 @@ exports.lastProcessedIdListener = async () => {
           database,
           table_name,
           field_name,
+          title_field,
           category,
           coid,
           lastProcessedId,
@@ -72,7 +73,7 @@ exports.lastProcessedIdListener = async () => {
 
         // Step 4: Fetch new rows from the table based on the last processed ID
         const [rows] = await connection.query(
-          `SELECT id, ${field_name} AS field_value,
+          `SELECT id, ${title_field} AS title, ${field_name} AS field_value,
                 LENGTH(${field_name}) AS file_size,
                 CURRENT_TIMESTAMP AS uploaded_at
             FROM ${table_name}
@@ -91,12 +92,11 @@ exports.lastProcessedIdListener = async () => {
           for (const row of rows) {
             let processedContent;
             let fileUrl = "";
+            const fileBuffer = row.field_value;
+            const fileName = row.title;
             const fileSizeInMB = (row.file_size / (1024 * 1024)).toFixed(2); // Convert to MB
 
             try {
-              const fileBuffer = row.field_value;
-              const fileName = `mysql_${database}_${table_name}_file_${row.id}`;
-
               // Detect MIME type dynamically
               const mimeType = await detectMimeType(fileBuffer);
 
@@ -144,7 +144,7 @@ exports.lastProcessedIdListener = async () => {
                   "@search.action": "mergeOrUpload",
                   id: `mysql_${database}_${table_name}_${row.id}_${index}`,
                   content: chunk,
-                  title: `MySQL Row ID ${row.id}`,
+                  title: fileName,
                   description: "No description",
                   image: null,
                   category: category,
