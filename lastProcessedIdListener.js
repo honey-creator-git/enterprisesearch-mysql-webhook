@@ -6,6 +6,7 @@ const axios = require("axios");
 const processFieldContent =
   require("./mysqlwebhookServices.js").processFieldContent;
 const processBlobField = require("./mysqlwebhookServices.js").processBlobField;
+const detectMimeType = require("./mysqlwebhookServices.js").detectMimeType;
 require("dotenv").config();
 
 function splitLargeText(content, maxChunkSize = 30000) {
@@ -49,7 +50,6 @@ exports.lastProcessedIdListener = async () => {
           database,
           table_name,
           field_name,
-          field_type,
           category,
           coid,
           lastProcessedId,
@@ -97,10 +97,20 @@ exports.lastProcessedIdListener = async () => {
               const fileBuffer = row.field_value;
               const fileName = `mysql_${database}_${table_name}_file_${row.id}`;
 
-              if (field_type.toLowerCase() === "blob") {
-                // Detect MIME type
-                const { extractedText, mimeType } = await processBlobField(
-                  fileBuffer
+              // Detect MIME type dynamically
+              const mimeType = await detectMimeType(fileBuffer);
+
+              if (
+                mimeType.startsWith("application/") ||
+                mimeType === "text/html" ||
+                mimeType === "text/csv" ||
+                mimeType === "text/xml" ||
+                mimeType === "text/plain"
+              ) {
+                console.log(`Detected MIME type: ${mimeType}`);
+                const { extractedText } = await processBlobField(
+                  fileBuffer,
+                  mimeType
                 );
 
                 // Upload file to Azure Blob Storage
@@ -112,15 +122,12 @@ exports.lastProcessedIdListener = async () => {
 
                 console.log("File URL => ", fileUrl);
 
-                // Extract Text from BLOB (PDF/DOCX)
                 processedContent = extractedText;
 
                 console.log("Extracted text from buffer => ", processedContent);
               } else {
-                processedContent = await processFieldContent(
-                  row.field_value,
-                  field_type
-                );
+                console.log("Unsupported MIME type:", mimeType);
+                continue;
               }
             } catch (error) {
               console.error(
@@ -143,7 +150,13 @@ exports.lastProcessedIdListener = async () => {
                   category: category,
                   fileUrl: fileUrl,
                   fileSize: parseFloat(fileSizeInMB), // Add file size (in MB)
-                  uploadedAt: row.uploaded_at, // Add uploaded timestamp
+                  uploadedAt:
+                    row.uploaded_at ||
+                    row.created_at ||
+                    row.updated_at ||
+                    row.uploadedAt ||
+                    row.createdAt ||
+                    row.updatedAt, // Add uploaded timestamp
                 });
               });
             }
